@@ -20,68 +20,60 @@ int die(yxml_ret_t r, yxml_t* x)
     fprintf(stderr, "error %i at line %u col %u %s", r, x->line, x->byte, reason);
     return -r;
 }
-void putc_escape(int c)
+void putc_escape(char* c)
 {
-    if (c == '\\')
+    if (*c == '\\')
         printf("\\\\");
-    else if (c == '\r')
+    else if (*c == '\r')
         printf("\\r");
-    else if (c == '\n')
+    else if (*c == '\n')
         printf("\\n");
-    else if (c == '\t')
+    else if (*c == '\t')
         printf("\\t");
     else
-        printf("%c", c);
+        printf("%s", c);
 }
 int main(int argc, char** argv)
 {
     yxml_t x;
-    yxml_ret_t r;
+    yxml_ret_t old_r, r = YXML_OK;
     char buf[BUFSIZE];
+    setbuf(stdout, NULL);
     yxml_init(&x, buf, BUFSIZE);
-    size_t need_close_attr = 0, need_close_tag = 0, depth = 0, last_elem_depth = -1, need_sep_attr = 0, element_has_text = 0;
+    size_t depth = 0, last_elem_depth = -1, element_has_text = 0;
     for (int c; (c = getchar()) != EOF;) {
-        r = yxml_parse(&x, c);
-        if (0 && r)
-            printf("(%i)", r);
-        if (r < 0) {
-            return die(r, &x);
+        yxml_ret_t tmp = yxml_parse(&x, c);
+        if (tmp < 0)
+            return die(tmp, &x);
+        if (tmp == YXML_OK)
+            continue;
+        element_has_text = tmp == YXML_CONTENT && ((c != ' ' && c != '\n' && c != '\r' && c != '\t') || element_has_text);
+        if (tmp == YXML_CONTENT && !element_has_text){
+            continue;
         }
-        // pre-processing (autoclose,...)
-        if (need_close_attr && (r == YXML_ELEMSTART || r == YXML_CONTENT || r == YXML_ELEMEND)) {
-            printf("},[");
-            need_close_attr = 0;
-        }
+        old_r = r;
+        r = tmp;
 
-        if (r == YXML_ELEMSTART) {
-            if (last_elem_depth == depth)
-                printf(",");
-            printf("[\"%s\",{", x.elem);
-            depth++;
-            need_close_attr = 1;
-            need_sep_attr = 0;
-			element_has_text = 0;
-        } else if (r == YXML_ATTRSTART) {
-            if (need_sep_attr)
-                printf(",");
-            printf("\"%s\":\"", x.attr);
-            need_sep_attr = 1;
-        } else if (r == YXML_ATTRVAL) {
-            putc_escape(c);
-        } else if (r == YXML_ATTREND) {
-            printf("\"");
-        } else if (r == YXML_CONTENT) {
-            int is_space = (c == ' ' || c == '\n' || c == '\r' || c == '\t');
-			if(!element_has_text && !is_space){printf("\"");}
-            element_has_text |= !is_space;
-			if(element_has_text)putc_escape(c);
-        } else if (r == YXML_ELEMEND) {
-			if(element_has_text){printf("\"");}
-			element_has_text=0;
-            printf("]]");
-            depth--;
-            last_elem_depth = depth;
-        }
+        // global test, put it first
+        if (old_r & YXML_CONTENT && !(r & YXML_CONTENT)) printf("\"");
+
+        if (r & YXML_ELEMSTART && old_r & YXML_ELEMSTART)printf(", {}, [");
+        if (r & YXML_ELEMSTART) printf("%s", (last_elem_depth == depth || old_r & YXML_CONTENT)?",":"");//0,1,2,4
+        if (r & YXML_ELEMSTART) printf("\n%*.s[\"%s\"", 2*(depth++),"",x.elem);
+        if (r & YXML_ATTRSTART && old_r & YXML_ELEMSTART)printf(", {");
+        if (r & YXML_ATTRSTART) printf("%s\"%s\":",(old_r & YXML_ATTREND?",":""),x.attr);
+        if (r & YXML_ATTRVAL && old_r & YXML_ATTRSTART)printf("\"");
+        if (r & YXML_ATTRVAL) putc_escape(x.data);
+        if (r & YXML_ATTREND) printf("\"");
+        if (r & YXML_CONTENT && old_r & YXML_ATTREND) printf("}, [");
+        if (r & YXML_CONTENT && old_r & YXML_ELEMSTART) printf(", {}, [");// insert empty object for easier JQ
+        if (r & YXML_CONTENT && !(old_r & YXML_CONTENT)) printf("%s\"",last_elem_depth == depth ? ",":"");//1,2,4,32
+        if (r & YXML_CONTENT) putc_escape(x.data);
+        if (r & YXML_ELEMEND && (old_r & YXML_ELEMSTART)) printf(", {}, []");// insert empty child for easeir jq
+        if (r & YXML_ELEMEND && (old_r & YXML_ATTREND)) printf("}, []");// insert empty child for easeir jq
+        if (r & YXML_ELEMEND && (old_r & YXML_CONTENT)) printf("]");
+        if (r & YXML_ELEMEND && (old_r & YXML_ELEMEND)) printf("]");
+        if (r & YXML_ELEMEND) printf("]",2*(last_elem_depth = --depth),"");
     }
     r = yxml_eof(&x);
     if (r < 0)

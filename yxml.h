@@ -42,13 +42,13 @@ typedef enum {
 	YXML_OK          =  0, /* Character consumed, no new token present   */
 	YXML_ELEMSTART   =  1, /* Start of an element:   '<Tag ..'           */
 	YXML_CONTENT     =  2, /* Element content                            */
-	YXML_ELEMEND     =  3, /* End of an element:     '.. />' or '</Tag>' */
-	YXML_ATTRSTART   =  4, /* Attribute:             'Name=..'           */
-	YXML_ATTRVAL     =  5, /* Attribute value                            */
-	YXML_ATTREND     =  6, /* End of attribute       '.."'               */
-	YXML_PISTART     =  7, /* Start of a processing instruction          */
-	YXML_PICONTENT   =  8, /* Content of a PI                            */
-	YXML_PIEND       =  9  /* End of a processing instruction            */
+	YXML_ELEMEND     =  4, /* End of an element:     '.. />' or '</Tag>' */
+	YXML_ATTRSTART   =  8, /* Attribute:             'Name=..'           */
+	YXML_ATTRVAL     =  16, /* Attribute value                            */
+	YXML_ATTREND     =  32, /* End of attribute       '.."'               */
+	YXML_PISTART     =  64, /* Start of a processing instruction          */
+	YXML_PICONTENT   =  128, /* Content of a PI                            */
+	YXML_PIEND       =  256  /* End of a processing instruction            */
 } yxml_ret_t;
 
 /* When, exactly, are tokens returned?
