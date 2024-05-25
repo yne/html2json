@@ -30,6 +30,8 @@ void putc_escape(char* c)
         printf("\\n");
     else if (*c == '\t')
         printf("\\t");
+    else if (*c == '"')
+        printf("\\\"");
     else
         printf("%s", c);
 }

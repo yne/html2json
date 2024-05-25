@@ -741,10 +741,10 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 			x->nextstate = YXMLS_misc1;
 			return ret | YXML_OK;
 		}
-		if(ch == (unsigned char)'D') {
+		if(ch == (unsigned char)'D' || ch == (unsigned char)'d') {
 			x->state = YXMLS_string;
 			x->nextstate = YXMLS_dt0;
-			x->string = (unsigned char *)"OCTYPE";
+			x->string = ch == (unsigned char)'D' ? (unsigned char *)"OCTYPE" : (unsigned char *)"octype";
 			return ret | YXML_OK;
 		}
 		break;
