@@ -1,4 +1,4 @@
-Convert any XML/HTML to JsonML
+Convert any XML/HTML to JsonML using [yxml](https://dev.yorhel.nl/yxml)
 
 ## BUILD
 
@@ -11,6 +11,8 @@ make html2json
 ```sh
 cat test/basic.html | ./html2json | jq .[1].lang
 "en"
+# send json to a frontend (example: GTK)
+curl https://news.ycombinator.com/rss | ./html2json | ./json2gtk
 ```
 
 ## FORMAT
@@ -53,12 +55,12 @@ cat test/basic.html | ./html2json | jq .[1].lang
 </td></tr>
 </table>
 
-# LIMITATIONS
+# HTML5 support (WIP)
 
-parsing is done by [yxml](https://dev.yorhel.nl/yxml) with the following changes for HTML support:
-- migrate `yxml_ret_t` to bitfield enum so multiple state can be returned (example : parsing `>` in `<p hidden>` will return `ATTREND|ELEMSTART`)
-- accept lowercase `<!doctype `
-- accept unquoted attribute value `<form method=GET>`
-- accept value-less attribute `<p hidden>`
-- (HTML5 mode) threat encoutered [void elements](https://developer.mozilla.org/en-US/docs/Glossary/Void_element) as self-closed
-- (HTML5 mode) ignore end-tag of void elements (ex: `</img>`)
+yxml was added XHTML and HTML5 using:
+- [x] migrate `yxml_ret_t` to bitfield enum so multiple state can be returned (example : parsing `>` in `<p hidden>` will return `ATTREND|ELEMSTART`)
+- [x] accept lowercase `<!doctype `
+- [x] read `<script>`, `<style>` content as raw data until matching closing tag id found 
+- [ ] accept unquoted attribute value `<form method=GET>`
+- [ ] accept value-less attribute `<p hidden id=p>`
+- [ ] handle [void elements](https://developer.mozilla.org/en-US/docs/Glossary/Void_element) as self-closed (`<img>` will internaly generate `<img></img>`), so alwo ignore end-tag of void elements (ex: `</img>`)
