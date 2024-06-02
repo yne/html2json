@@ -107,15 +107,31 @@ typedef enum {
 #define yxml_isNameStart(c) (yxml_isAlpha(c) || c == ':' || c == '_' || c >= 128)
 #define yxml_isName(c) (yxml_isNameStart(c) || yxml_isNum(c) || c == '-' || c == '.')
 /* XXX: The valid characters are dependent on the quote char, hence the access to x->quote */
-#define yxml_isAttValue(c) (yxml_isChar(c) && c != x->quote && c != '<' && c != '&')
+#define yxml_isAttValue(c) (yxml_isChar(c) && c != x->quote && c != '<' && (x->html5 ? 1 : c != '&'))
+#define yxml_isAttValueQuoteless(c) (yxml_isChar(c) && c != '>' && !yxml_isSP(c) && c != '"' && c != '\'')
 /* Anything between '&' and ';', the yxml_ref* functions will do further
  * validation. Strictly speaking, this is "yxml_isName(c) || c == '#'", but
  * this parser doesn't understand entities with '.', ':', etc, anwyay.  */
 #define yxml_isRef(c) (yxml_isNum(c) || yxml_isAlpha(c) || c == '#')
 
 #define INTFROM5CHARS(a, b, c, d, e) ((((uint64_t)(a))<<32) | (((uint64_t)(b))<<24) | (((uint64_t)(c))<<16) | (((uint64_t)(d))<<8) | (uint64_t)(e))
-
-
+/*
+* tell if given element does not need closing tag
+* opening tag shall self-close it ASAP, closing tag of void shall be skip
+* https://html.spec.whatwg.org/multipage/grouping-content.html
+*/
+static inline int yxml_elemisvoid (yxml_t *x) {
+	const char* voids[] = {
+		"", "area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"
+	};
+	//return -1;
+	for (int i = 1; i < sizeof(voids)/sizeof(*voids); i++) {
+		if (strcmp(x->elem, voids[i]) == 0) {
+			return i;
+		}
+	}
+	return 0;
+}
 /* Set the given char value to ch (0<=ch<=255).
  * This can't be done with simple assignment because char may be signed, and
  * unsigned-to-signed overflow is implementation defined in C. This function
@@ -310,6 +326,8 @@ static yxml_ret_t yxml_refend(yxml_t *x, yxml_ret_t ret) {
 			i == INTFROM5CHARS('l','t', 0,  0, 0) ? '<' :
 			i == INTFROM5CHARS('g','t', 0,  0, 0) ? '>' :
 			i == INTFROM5CHARS('a','m','p', 0, 0) ? '&' :
+			i == INTFROM5CHARS('n','b','s','p',0) ? ' ' :
+			i == INTFROM5CHARS('c','o','p','y',0) ? 'c' :
 			i == INTFROM5CHARS('a','p','o','s',0) ? '\'':
 			i == INTFROM5CHARS('q','u','o','t',0) ? '"' : 0;
 	}
@@ -364,6 +382,7 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 	}
 	x->byte++;
 
+//	printf("(%i)",x->state);
 	switch((yxml_state_t)x->state) {
 	case YXMLS_string:
 		if(ch == *x->string) {
@@ -401,15 +420,36 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 			x->quote = ch;
 			return ret | YXML_OK;
 		}
-		break;
+		if(ch == (unsigned char)'>') {
+			x->state = YXMLS_attr4;
+			return ret | yxml_dataattr(x, '\0') | yxml_attrvalend(x, '\0');
+		}
+		// quoteless mode : fallthrough in YXMLS_attr3
+		x->quote = '\0';
+		x->state = YXMLS_attr3;
+		x->html5 = 1;
+		// fallthrough
 	case YXMLS_attr3:
+		if(x->quote == '\0') {
+			if(yxml_isAttValueQuoteless(ch))
+				return ret | yxml_dataattr(x, ch);
+			if(yxml_isSP(ch)) {
+				x->state = YXMLS_elem1;
+				return ret | yxml_attrvalend(x, '\0');
+			}
+			if(ch == (unsigned char)'>') {
+				x->state = YXMLS_misc2;
+				return ret | yxml_attrvalend(x, '\0'); // yxml_elemnameend(x, '\0')
+			}
+			break;
+		}
 		if(yxml_isAttValue(ch))
 			return ret | yxml_dataattr(x, ch);
 		if(ch == (unsigned char)'&') {
 			x->state = YXMLS_attr4;
 			return ret | yxml_refstart(x, ch);
 		}
-		if(x->quote == ch) {
+		if(ch == x->quote) {
 			x->state = YXMLS_elem2;
 			return ret | yxml_attrvalend(x, ch);
 		}
@@ -417,7 +457,7 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 	case YXMLS_attr4:
 		if(yxml_isRef(ch))
 			return ret | yxml_ref(x, ch);
-		if(ch == (unsigned char)'\x3b') {
+		if(ch == (unsigned char)';') {
 			x->state = YXMLS_attr3;
 			return ret | yxml_refattrval(x, ch);
 		}
@@ -563,7 +603,7 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 		}
 		if(ch == (unsigned char)'>') {
 			x->state = YXMLS_misc2;
-			return ret | yxml_elemnameend(x, ch);
+			return ret |= yxml_elemnameend(x, ch) | (yxml_elemisvoid(x) ? yxml_selfclose(x, ch) : YXML_OK);
 		}
 		break;
 	case YXMLS_elem1:
@@ -575,7 +615,7 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 		}
 		if(ch == (unsigned char)'>') {
 			x->state = YXMLS_misc2;
-			return ret | YXML_OK;
+			return ret | (yxml_elemisvoid(x) ? yxml_selfclose(x, ch) : YXML_OK);
 		}
 		if(yxml_isNameStart(ch)) {
 			x->state = YXMLS_attr0;
@@ -593,7 +633,7 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 		}
 		if(ch == (unsigned char)'>') {
 			x->state = YXMLS_misc2;
-			return ret | YXML_OK;
+			return ret | (yxml_elemisvoid(x) ? yxml_selfclose(x, ch) : YXML_OK);
 		}
 		break;
 	case YXMLS_elem3:

@@ -72,7 +72,8 @@ int main(int argc, char** argv)
         if (tmp == YXML_CONTENT && !element_has_text){
             continue;
         }
-        old_r = r;
+        #define is_self_close(ctx) ((ctx & YXML_ELEMSTART) && (ctx & YXML_ELEMEND))
+        old_r = is_self_close(r) ? r&~YXML_ELEMSTART : r;
         r = tmp;
 
         // global test, put it first
@@ -82,11 +83,12 @@ int main(int argc, char** argv)
         if (r & YXML_ELEMSTART && old_r & YXML_ATTREND) printf("}, [");
         if (r & YXML_ELEMSTART && old_r & YXML_ELEMSTART)printf(", {}, [");
         if (r & YXML_ELEMSTART) printf("%s", (last_elem_depth == depth || old_r & YXML_CONTENT)?",":"");
-        if (r & YXML_ELEMSTART) printf("\n%*.s[\"%s\"", 2*(depth++),"",x.elem, isRawTag=!strcmp(x.elem, "script")?1:!strcmp(x.elem, "style")?2:0);
+        if (r & YXML_ELEMSTART) printf("\n%*.s[\"%s\"", 2*(depth++),"",is_self_close(r)?(char*)x.stack+x.stacklen+1:x.elem, isRawTag=!strcmp(x.elem, "script")?1:!strcmp(x.elem, "style")?2:0);
         if (r & YXML_ATTRSTART && old_r & YXML_ELEMSTART)printf(", {");
         if (r & YXML_ATTRSTART) printf("%s\"%s\":",(old_r & YXML_ATTREND?",":""),x.attr);
         if (r & YXML_ATTRVAL && old_r & YXML_ATTRSTART)printf("\"");
         if (r & YXML_ATTRVAL) putc_escape(x.data);
+        if (r & YXML_ATTREND && old_r & YXML_ATTRSTART)printf("\"");
         if (r & YXML_ATTREND) printf("\"");
         if (r & YXML_CONTENT && old_r & YXML_ATTREND) printf("}, [");
         if (r & YXML_CONTENT && old_r & YXML_ELEMSTART) printf(", {}, [");

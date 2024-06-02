@@ -114,6 +114,7 @@ typedef struct {
 
 	/* PRIVATE */
 	int state;
+	int html5;// accept raw & in attr (href="/t?a=1&b=2")
 	unsigned char *stack; /* Stack of element names + attribute/PI name, separated by \0. Also starts with a \0. */
 	size_t stacksize, stacklen;
 	unsigned reflen;
