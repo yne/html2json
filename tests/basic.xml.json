@@ -1,0 +1,117 @@
+[
+  "rss",
+  {
+    "version": "2.0"
+  },
+  [
+    [
+      "channel",
+      {},
+      [
+        [
+          "title",
+          {},
+          [
+            "Hacker News"
+          ]
+        ],
+        [
+          "link",
+          {},
+          [
+            "https://news.ycombinator.com/"
+          ]
+        ],
+        [
+          "description",
+          {},
+          [
+            "Links for the intellectually curious, ranked by readers."
+          ]
+        ],
+        [
+          "item",
+          {},
+          [
+            [
+              "title",
+              {},
+              [
+                "Hurl, the Exceptional Language"
+              ]
+            ],
+            [
+              "link",
+              {},
+              [
+                "https://hurl.wtf/"
+              ]
+            ],
+            [
+              "pubDate",
+              {},
+              [
+                "Sun, 26 May 2024 05:57:52 +0000"
+              ]
+            ],
+            [
+              "comments",
+              {},
+              [
+                "https://news.ycombinator.com/item?id=40480056"
+              ]
+            ],
+            [
+              "description",
+              {},
+              [
+                "<a href=\"https://news.ycombinator.com/item?id=40480056\">Comments</a>"
+              ]
+            ]
+          ]
+        ],
+        [
+          "item",
+          {},
+          [
+            [
+              "title",
+              {},
+              [
+                "Turn Your iPhone into a Dumb Phone"
+              ]
+            ],
+            [
+              "link",
+              {},
+              [
+                "https://dumbph.com/turn-iphone-into-dumb-phone"
+              ]
+            ],
+            [
+              "pubDate",
+              {},
+              [
+                "Sun, 26 May 2024 07:30:44 +0000"
+              ]
+            ],
+            [
+              "comments",
+              {},
+              [
+                "https://news.ycombinator.com/item?id=40480323"
+              ]
+            ],
+            [
+              "description",
+              {},
+              [
+                "<a href=\"https://news.ycombinator.com/item?id=40480323\">Comments</a>"
+              ]
+            ]
+          ]
+        ]
+      ]
+    ]
+  ]
+]
