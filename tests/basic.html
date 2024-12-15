@@ -1,6 +1,21 @@
 <!DOCTYPE html>
-<html lang="fr">
-<body>
-    test
-</body>
+<!-- no allowed text before :root element (<html>) -->
+<html lang="en">
+
+Classic HTML:
+<form action="get.do">
+	<input name="user"/>
+	<input name="password"/>
+</form>
+
+HTML5 void tags (no children allowed) in 3 example:
+<ul class=list>
+	<li><img src="ok">don't need closing (/img) tag</li>
+	<li><br/>can be self-closed (/ at the end of tag)</li>
+	<li><hr>but <b>must not</b> have closing tag</li>
+</ul>
+
+Not supported yet:
+<!-- <div hidden> -->
+
 </html>

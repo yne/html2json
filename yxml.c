@@ -107,7 +107,7 @@ typedef enum {
 #define yxml_isNameStart(c) (yxml_isAlpha(c) || c == ':' || c == '_' || c >= 128)
 #define yxml_isName(c) (yxml_isNameStart(c) || yxml_isNum(c) || c == '-' || c == '.')
 /* XXX: The valid characters are dependent on the quote char, hence the access to x->quote */
-#define yxml_isAttValue(c) (yxml_isChar(c) && c != x->quote && c != '<' && (x->html5 ? 1 : c != '&'))
+#define yxml_isAttValue(c) (yxml_isChar(c) && c != x->quote && c != '<' && (x->xml ? c != '&' : 1))
 #define yxml_isAttValueQuoteless(c) (yxml_isChar(c) && c != '>' && !yxml_isSP(c) && c != '"' && c != '\'')
 /* Anything between '&' and ';', the yxml_ref* functions will do further
  * validation. Strictly speaking, this is "yxml_isName(c) || c == '#'", but
@@ -124,9 +124,11 @@ static inline int yxml_elemisvoid (yxml_t *x) {
 	const char* voids[] = {
 		"", "area","base","br","col","embed","hr","img","input","link","meta","param","source","track","wbr"
 	};
-	//return -1;
+	if (x->xml) {
+		return 0;
+	}
 	for (int i = 1; i < sizeof(voids)/sizeof(*voids); i++) {
-		if (strcmp(x->elem, voids[i]) == 0) {
+		if (strcasecmp(x->elem, voids[i]) == 0) {
 			return i;
 		}
 	}
@@ -354,7 +356,7 @@ void yxml_init(yxml_t *x, void *stack, size_t stacksize) {
 	x->state = YXMLS_init;
 }
 
-
+#include <stdio.h>
 yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 	/* HTML may return multiple state for 1 token:
 	 * parsing the ">" in "<tag hidden>" will both close the value-less attribute AND tag */
@@ -381,8 +383,7 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 		x->byte = 0;
 	}
 	x->byte++;
-
-//	printf("(%i)",x->state);
+	again:
 	switch((yxml_state_t)x->state) {
 	case YXMLS_string:
 		if(ch == *x->string) {
@@ -403,7 +404,8 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 			x->state = YXMLS_attr2;
 			return ret | yxml_attrnameend(x, ch);
 		}
-		break;
+		if(x->xml)break;
+		// fallthrough for attr without value
 	case YXMLS_attr1:
 		if(yxml_isSP(ch))
 			return ret | YXML_OK;
@@ -411,7 +413,9 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 			x->state = YXMLS_attr2;
 			return ret | YXML_OK;
 		}
-		break;
+		if(x->xml)break;
+		ret |= yxml_attrnameend(x, '\0') | yxml_attrvalend(x, '\0');
+		// fallthrough for attr without value
 	case YXMLS_attr2:
 		if(yxml_isSP(ch))
 			return ret | YXML_OK;
@@ -421,14 +425,13 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 			return ret | YXML_OK;
 		}
 		if(ch == (unsigned char)'>') {
-			x->state = YXMLS_attr4;
+			x->state = YXMLS_misc2;
 			return ret | yxml_dataattr(x, '\0') | yxml_attrvalend(x, '\0');
 		}
-		// quoteless mode : fallthrough in YXMLS_attr3
+		if (x->xml) break;
 		x->quote = '\0';
 		x->state = YXMLS_attr3;
-		x->html5 = 1;
-		// fallthrough
+		// fallthrough for quoteless mode
 	case YXMLS_attr3:
 		if(x->quote == '\0') {
 			if(yxml_isAttValueQuoteless(ch))
@@ -445,11 +448,11 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 		}
 		if(yxml_isAttValue(ch))
 			return ret | yxml_dataattr(x, ch);
-		if(ch == (unsigned char)'&') {
+		if(ch == (unsigned char)'&') { //TODO:skip for HTML5
 			x->state = YXMLS_attr4;
 			return ret | yxml_refstart(x, ch);
 		}
-		if(ch == x->quote) {
+		if(x->quote == ch) {
 			x->state = YXMLS_elem2;
 			return ret | yxml_attrvalend(x, ch);
 		}
@@ -457,7 +460,7 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 	case YXMLS_attr4:
 		if(yxml_isRef(ch))
 			return ret | yxml_ref(x, ch);
-		if(ch == (unsigned char)';') {
+		if(ch == (unsigned char)'\x3b') {
 			x->state = YXMLS_attr3;
 			return ret | yxml_refattrval(x, ch);
 		}
@@ -952,6 +955,7 @@ yxml_ret_t yxml_parse(yxml_t *x, int _ch) {
 			x->quote = ch;
 			x->nextstate = YXMLS_ver2;
 			x->string = (unsigned char *)"1.";
+			x->xml = 1;
 			return ret | YXML_OK;
 		}
 		break;

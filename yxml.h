@@ -41,11 +41,11 @@ typedef enum {
 	YXML_ESYN        = -1, /* Syntax error (unexpected byte)             */
 	YXML_OK          =  0, /* Character consumed, no new token present   */
 	YXML_ELEMSTART   =  1, /* Start of an element:   '<Tag ..'           */
-	YXML_CONTENT     =  2, /* Element content                            */
-	YXML_ELEMEND     =  4, /* End of an element:     '.. />' or '</Tag>' */
-	YXML_ATTRSTART   =  8, /* Attribute:             'Name=..'           */
-	YXML_ATTRVAL     =  16, /* Attribute value                            */
-	YXML_ATTREND     =  32, /* End of attribute       '.."'               */
+	YXML_ATTRSTART   =  2, /* Attribute:             'Name=..'           */
+	YXML_ATTRVAL     =  4, /* Attribute value                            */
+	YXML_ATTREND     =  8, /* End of attribute       '.."'               */
+	YXML_CONTENT     =  16, /* Element content                            */
+	YXML_ELEMEND     =  32, /* End of an element:     '.. />' or '</Tag>' */
 	YXML_PISTART     =  64, /* Start of a processing instruction          */
 	YXML_PICONTENT   =  128, /* Content of a PI                            */
 	YXML_PIEND       =  256  /* End of a processing instruction            */
@@ -114,7 +114,7 @@ typedef struct {
 
 	/* PRIVATE */
 	int state;
-	int html5;// accept raw & in attr (href="/t?a=1&b=2")
+	int xml;/* activated at <?xml tag, distinguish between XML and HTML5 which accept '&' in int attr (href="/t?a=1&b=2") */
 	unsigned char *stack; /* Stack of element names + attribute/PI name, separated by \0. Also starts with a \0. */
 	size_t stacksize, stacklen;
 	unsigned reflen;

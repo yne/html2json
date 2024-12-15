@@ -4,7 +4,7 @@
 #ifndef BUFSIZE
 #define BUFSIZE 4096
 #endif
-#define INTFROM8CHARS(a, b, c, d, e, f, g, h) (    (((uint64_t)(a))<<56) |    (((uint64_t)(b))<<48) |    (((uint64_t)(c))<<40) |    (((uint64_t)(d))<<32) |    (((uint64_t)(e))<<24) |   (((uint64_t)(f))<<16) |    (((uint64_t)(g))<<8) |    (uint64_t)(h))
+#define INTFROM8CHARS(a, b, c, d, e, f, g, h) ((((uint64_t)(a)) << 56) | (((uint64_t)(b)) << 48) | (((uint64_t)(c)) << 40) | (((uint64_t)(d)) << 32) | (((uint64_t)(e)) << 24) | (((uint64_t)(f)) << 16) | (((uint64_t)(g)) << 8) | (uint64_t)(h))
 
 int die(yxml_ret_t r, yxml_t* x)
 {
@@ -22,7 +22,7 @@ int die(yxml_ret_t r, yxml_t* x)
     fprintf(stderr, "error %i at line %u col %u %s while in state:%i\n", r, x->line, x->byte, reason, x->state);
     return -r;
 }
-void putc_escape(char* c)
+void puts_escaped(char* c)
 {
     if (*c == '\\')
         printf("\\\\");
@@ -37,72 +37,87 @@ void putc_escape(char* c)
     else
         printf("%s", c);
 }
-uint64_t stack=0;
-void getcharUntil(uint64_t limit) {
-    char str[2]={0,0};
+uint64_t stack = 0;
+void getcharUntil(uint64_t limit)
+{
+    char str[2] = { 0, 0 };
     stack = 0;
     for (int c; (c = getchar()) != EOF;) {
         stack = (stack << 8) | (uint64_t)c;
-        if(stack == limit)break;
-        str[0]=c;
-        putc_escape(str);
+        if (stack == limit)
+            break;
+        str[0] = c;
+        puts_escaped(str);
     }
 }
-int unstackOrGetChar() {
-    if(!stack)return getchar();
-    int c = stack>>56;
+int unstackOrGetChar()
+{
+    if (!stack)
+        return getchar();
+    int c = stack >> 56;
     stack <<= 8;
     return c;
 }
+typedef struct {
+    char *pre, *data, *post;
+} Printer;
+
 int main(int argc, char** argv)
 {
     yxml_t x;
-    yxml_ret_t old_r, r = YXML_OK;
+    yxml_ret_t r = YXML_OK;
+    int i = 0, old_index = 1; // so we arrive in YXML_ELEMSTART with from a recognizable impossible state (YXML_ATTRSTART)
     char buf[BUFSIZE];
     setbuf(stdout, NULL);
     yxml_init(&x, buf, BUFSIZE);
     size_t depth = 0, last_elem_depth = -1, element_has_text = 0, isRawTag = 0;
     for (int c; (c = unstackOrGetChar()) != EOF;) {
-        yxml_ret_t tmp = yxml_parse(&x, c);
-        if (tmp < 0)
-            return die(tmp, &x);
-        if (tmp == YXML_OK)
+        yxml_ret_t ret_field = yxml_parse(&x, c);
+        //        printf("(%i:%c)",ret_field, c);
+        if (ret_field < 0)
+            return die(ret_field, &x);
+        if (ret_field == YXML_OK)
             continue;
-        element_has_text = tmp == YXML_CONTENT && ((c != ' ' && c != '\n' && c != '\r' && c != '\t') || element_has_text);
-        if (tmp == YXML_CONTENT && !element_has_text){
-            continue;
+        if (ret_field & YXML_ELEMSTART)
+            isRawTag = !strcmp(x.elem, "script") ? 1 : !strcmp(x.elem, "style") ? 2
+                                                                                : 0;
+        // skip whitespace between tags
+        //element_has_text = ret_field & YXML_CONTENT && ((c != ' ' && c != '\n' && c != '\r' && c != '\t') || element_has_text);
+        //if (ret_field & YXML_CONTENT && !element_has_text) {
+        //    continue;
+        //}
+        // get from stack when element is open+closed (<br>)
+        char* el = ((ret_field & YXML_ELEMSTART) && (ret_field & YXML_ELEMEND)) ? (char*)x.stack + x.stacklen + 1 : x.elem;
+        for (int ret_index = 0; ret_index < 6; ret_index++) {
+            if (!((1 << ret_index) & ret_field))
+                continue;
+            Printer p = ((Printer[6][6]) {
+                /* YXML_ELEMSTART */ { { "},[\n[\"", el, "\",{" }, { "[\"", el, "\",{" }, {}, { "},[[\"", el, "\",{" }, { "\",[\"", el, "\",{" }, { ",[\"", el, "\",{" } },
+                /* YXML_ATTRSTART */ { { "\"", x.attr, "\":\"" }, {}, {}, { ",\"", x.attr, "\":\"" }, {}, {} },
+                /* YXML_ATTRVAL   */ { {}, { "", x.data }, { "", x.data }, {}, {}, {} },
+                /* YXML_ATTREND   */ { {}, {}, { "\"" }, {}, {}, {} },
+                /* YXML_CONTENT   */ { { "},[\"", x.data }, { "\"", x.data }, {}, { "},[\"", x.data }, { "", x.data }, { ",\"", x.data } },
+                /* YXML_ELEMEND   */ { { "},[]]" }, {}, {}, { "},[]]" }, { "\"]]" }, { "]]" } },
+            })[ret_index][old_index];
+            if (p.pre)
+                fputs(p.pre, stdout);
+            else
+                printf("Missing Transition[%i][%i]", ret_index, old_index);
+            if (p.data)
+                puts_escaped(p.data);
+            if (p.post)
+                fputs(p.post, stdout);
+            old_index = ret_index;
         }
-        #define is_self_close(ctx) ((ctx & YXML_ELEMSTART) && (ctx & YXML_ELEMEND))
-        old_r = is_self_close(r) ? r&~YXML_ELEMSTART : r;
-        r = tmp;
-
-        // global test, put it first
-        if (old_r & YXML_CONTENT && !(r & YXML_CONTENT)) printf("\"");
-        // TODO: smarter way of doing that:
-        // use a list of {[state]:str,...} so we can do multiple printf according to the [old_r...r] range
-        if (r & YXML_ELEMSTART && old_r & YXML_ATTREND) printf("}, [");
-        if (r & YXML_ELEMSTART && old_r & YXML_ELEMSTART)printf(", {}, [");
-        if (r & YXML_ELEMSTART) printf("%s", (last_elem_depth == depth || old_r & YXML_CONTENT)?",":"");
-        if (r & YXML_ELEMSTART) printf("\n%*.s[\"%s\"", 2*(depth++),"",is_self_close(r)?(char*)x.stack+x.stacklen+1:x.elem, isRawTag=!strcmp(x.elem, "script")?1:!strcmp(x.elem, "style")?2:0);
-        if (r & YXML_ATTRSTART && old_r & YXML_ELEMSTART)printf(", {");
-        if (r & YXML_ATTRSTART) printf("%s\"%s\":",(old_r & YXML_ATTREND?",":""),x.attr);
-        if (r & YXML_ATTRVAL && old_r & YXML_ATTRSTART)printf("\"");
-        if (r & YXML_ATTRVAL) putc_escape(x.data);
-        if (r & YXML_ATTREND && old_r & YXML_ATTRSTART)printf("\"");
-        if (r & YXML_ATTREND) printf("\"");
-        if (r & YXML_CONTENT && old_r & YXML_ATTREND) printf("}, [");
-        if (r & YXML_CONTENT && old_r & YXML_ELEMSTART) printf(", {}, [");
-        if (r & YXML_CONTENT && !(old_r & YXML_CONTENT)) printf("%s\"",last_elem_depth == depth ? ",":"");
-        if (r & YXML_CONTENT) putc_escape(x.data);
-        if (r & YXML_ELEMEND && (old_r & YXML_ELEMSTART)) printf(", {}, []");
-        if (r & YXML_ELEMEND && (old_r & YXML_ATTREND)) printf("}, []");
-        if (r & YXML_ELEMEND && (old_r & YXML_CONTENT)) printf("]");
-        if (r & YXML_ELEMEND && (old_r & YXML_ELEMEND)) printf("]");
-        if (r & YXML_ELEMEND) printf("]",2*(last_elem_depth = --depth),"");
-        if (r & YXML_CONTENT && isRawTag) { // TODO: find a better trigger
-            if(isRawTag==1)getcharUntil(INTFROM8CHARS('<','/','s','c','r','i','p','t'));
-            if(isRawTag==2)getcharUntil(INTFROM8CHARS('<','/','s','t','y','l','e','>'));
-        }
+        //if (ret_field & YXML_CONTENT) {
+        //    if (isRawTag == 1) {
+        //        getcharUntil(INTFROM8CHARS('<', '/', 's', 'c', 'r', 'i', 'p', 't'));
+        //        unstackOrGetChar();
+        //    }
+        //    if (isRawTag == 2) {
+        //        getcharUntil(INTFROM8CHARS('<', '/', 's', 't', 'y', 'l', 'e', '>'));
+        //    }
+        //}
     }
     r = yxml_eof(&x);
     if (r < 0)

@@ -1,15 +1,94 @@
 [
   "html",
   {
-    "lang": "fr"
+    "lang": "en"
   },
   [
+    "\n\nClassic HTML:\n",
     [
-      "body",
-      {},
+      "form",
+      {
+        "action": "get.do"
+      },
       [
-        "test\n"
+        "\n\t",
+        [
+          "input",
+          {
+            "name": "user"
+          },
+          []
+        ],
+        "\n\t",
+        [
+          "input",
+          {
+            "name": "password"
+          },
+          []
+        ],
+        "\n"
       ]
-    ]
+    ],
+    "\n\nHTML5 void tags (no children allowed) in 3 example:\n",
+    [
+      "ul",
+      {
+        "class": "list"
+      },
+      [
+        "\n\t",
+        [
+          "li",
+          {},
+          [
+            [
+              "img",
+              {
+                "src": "ok"
+              },
+              []
+            ],
+            "don't need closing (/img) tag"
+          ]
+        ],
+        "\n\t",
+        [
+          "li",
+          {},
+          [
+            [
+              "br",
+              {},
+              []
+            ],
+            "can be self-closed (/ at the end of tag)"
+          ]
+        ],
+        "\n\t",
+        [
+          "li",
+          {},
+          [
+            [
+              "hr",
+              {},
+              []
+            ],
+            "but ",
+            [
+              "b",
+              {},
+              [
+                "must not"
+              ]
+            ],
+            " have closing tag"
+          ]
+        ],
+        "\n"
+      ]
+    ],
+    "\n\nNot supported yet:\n\n\n"
   ]
 ]

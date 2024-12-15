@@ -1,18 +1,19 @@
 name: CI
-
+permissions:
+  contents: write
 on:
   push:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
-    - run: make html2json
-    - name: publish
+    - run: make test
+    - run: strip html2json && upx -9 html2json
+    - name: tag and publish
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         RELEASE_FILES: html2json
